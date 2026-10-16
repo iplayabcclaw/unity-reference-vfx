@@ -1,112 +1,12 @@
-# 翻卷纤维气流：御剑师实现参考
+# 翻卷纤维气流：几何与运动参考
 
-类型：随 skill 提供的代码参考。适用于宽面翻卷气纱、护体伴随气流、沿真实路径留下的卷云。用户认可的御剑师气流是本配方的视觉基准；这是优先参考的成熟做法，不要求所有风效果都采用同样颜色和摆放。
+类型：随 skill 提供的无贴图几何参考。适用于宽面翻卷气纱、护体伴随气流和沿真实路径留下的卷云。仅复用曲面、摆放与路径采样方法，不保证复现任何旧材质的观感。
 
-本文件集中保存气流 Shader、翻卷网格、三股蓄势／四片护体摆放、三层路径卷云代码。代码仅依赖 Unity API；Shader 示例使用 URP，其他管线替换坐标变换与纹理声明，保留密度、混合和颜色公式。原项目的英雄类型、对象池、战斗状态和资源路径已移除，不需要原仓库。
+所有实现遵守 [禁止贴图约束](../SKILL.md#硬性约束禁止贴图)。本文不提供纹理或纹理采样 Shader；调用方须使用直接计算纤维、密度、柔边与明暗的程序材质，不能以透明面片图片、噪声贴图或 Flow Map 补齐。
 
-## 必须一起带走的素材
+宽面沿长度扭转，横截面边缘卷起，头尾收窄；实际网格承担轮廓和翻卷，顶点 Alpha 表达端部与横向柔边。内部纤维须按参考图实现程序场，不能把通用噪声当成已还原。下列 Paint 示例使用 `_Color`、`_Opacity`、`_Age`、`_Emission`，接入时核对实际无贴图 Shader 的属性契约。
 
-使用 skill 内的 [sword-airflow.png](../assets/sword-airflow.png)。它提供卷曲纤维密度，不可随意替换成白噪声后仍期待同样效果。文件分开保存以避免把二进制贴图塞进代码；分发时携带整个 skill 目录。
-
-读取纹理红通道；按原素材设置关闭 sRGB，启用双线性过滤和 Mipmap（这是保留现有显示的基准，不是对所有密度图的通用导入建议）。采样函数自己做镜像坐标，原导入寻址为 Clamp；移植时保留原始分辨率先对齐效果，再按目标平台测试压缩与降采样。不要重新生成素材或叠加多张噪声来代替它。
-
-## 为什么它能表现气流
-
-- 宽面沿长度方向扭转，横截面边缘卷起，头尾收窄；轮廓不靠透明贴图独自支撑。
-- 同一张纤维贴图采样两次，组合主密度与细节，UV 随局部视觉年龄推进。
-- 顶点 Alpha 提供端部和横向柔边，密度控制内部透明与局部亮丝；普通透明混合保留青色暗部。
-- 三股蓄势、四片镜像护体、三层路径云共享材质方法，但位置与运动各自明确。
-
-## 1. 气流与云的 URP Shader
-
-保存为 `FoldedAirflow.shader` 并显式赋给材质。保留原气流／云公式，删去不相关的金属与青玉分支，以及只有这些分支使用的法线、视线运算。`_Surface` 只取 0（气流）或 1（云），创建后保持不变。
-
-```hlsl
-Shader "Reference/FoldedAirflow"
-{
-    Properties
-    {
-        _MainTex ("Authored curled airflow density", 2D) = "black" {}
-        _Color ("Layer colour", Color) = (1,1,1,1)
-        _Surface ("Air (0) / cloud (1)", Float) = 0
-        _Opacity ("Independent layer opacity", Range(0,1)) = 1
-        _Age ("Paused local clock", Float) = 0
-        _Emission ("Local fibre and facet highlights", Float) = 1.5
-        _ZWrite ("Depth write", Float) = 0
-    }
-    SubShader
-    {
-        Tags { "RenderPipeline"="UniversalPipeline" "Queue"="Transparent" "RenderType"="Transparent" }
-        Pass
-        {
-            Tags { "LightMode"="SRPDefaultUnlit" }
-            Cull Off
-            ZWrite [_ZWrite]
-            ZTest LEqual
-            Blend SrcAlpha OneMinusSrcAlpha
-            HLSLPROGRAM
-            #pragma target 3.0
-            #pragma vertex Vert
-            #pragma fragment Frag
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            TEXTURE2D(_MainTex); SAMPLER(sampler_MainTex);
-            CBUFFER_START(UnityPerMaterial)
-                float4 _Color;
-                float _Surface, _Opacity, _Age, _Emission;
-            CBUFFER_END
-            struct Attributes
-            {
-                float4 positionOS:POSITION;
-                float2 uv:TEXCOORD0;
-                float4 color:COLOR;
-            };
-            struct Varyings
-            {
-                float4 positionCS:SV_POSITION;
-                float2 uv:TEXCOORD0;
-                float4 color:COLOR;
-            };
-            Varyings Vert(Attributes v)
-            {
-                Varyings o;
-                o.positionCS=TransformObjectToHClip(v.positionOS.xyz);
-                o.uv=v.uv;
-                o.color=v.color*_Color;
-                return o;
-            }
-            // Mirrored sampling joins the authored borders continuously without baking floor or glow into a sheet.
-            float Density(float2 uv)
-            {
-                uv=1-abs(frac(uv*.5)*2-1);
-                return SAMPLE_TEXTURE2D(_MainTex,sampler_MainTex,uv).r;
-            }
-            half4 Frag(Varyings i):SV_Target
-            {
-                float alpha=i.color.a*_Opacity;
-                float3 rgb=i.color.rgb;
-                float cloud=step(.5,_Surface);
-                // Geometric folds carry the silhouette; the authored texture carries curled fibres inside it.
-                float2 uv=float2(i.uv.x*lerp(.72,.43,cloud)-_Age*lerp(.30,.17,cloud),i.uv.y*.73);
-                float primary=Density(uv);
-                float detail=Density(uv*float2(1.83,1.27)+float2(-_Age*.06,.37));
-                float field=saturate(primary*.88+detail*.30);
-                float across=pow(saturate(sin(saturate(i.uv.y)*3.14159265)),.46);
-                float veil=smoothstep(.025,.64,field);
-                alpha*=across*lerp(.11+veil*.83,.08+veil*.90,cloud);
-                float fibres=smoothstep(.20,.65,field)*smoothstep(.06,.60,detail);
-                rgb*=.73+field*.88;
-                rgb+=i.color.rgb*fibres*_Emission*.80;
-                clip(alpha-.003);
-                return half4(rgb,alpha);
-            }
-            ENDHLSL
-        }
-    }
-}
-
-```
-
-## 2. 翻卷网格与局部摆放
+## 1. 翻卷网格与局部摆放
 
 ```csharp
 using System;
@@ -117,18 +17,6 @@ using UnityEngine.Rendering;
 // Save this block as FoldedAirflowReference.cs. Unity APIs must run on the main thread.
 public static class FoldedAirflowReference
 {
-    public static Material CreateMaterial(Shader shader, Texture2D density, bool cloud = false)
-    {
-        if (shader == null || density == null)
-            throw new ArgumentException("Assign the bundled airflow shader and density texture.");
-        var material = new Material(shader) { name = "Folded airflow reference" };
-        material.SetTexture("_MainTex", density);
-        material.SetFloat("_Surface", cloud ? 1f : 0f);
-        material.SetFloat("_ZWrite", 0f);
-        material.renderQueue = 3000;
-        return material;
-    }
-
     // Allocate once during initialization, then pass the same block on every update.
     // This replaces the renderer's property block; merge with the project's block if necessary.
     public static void Paint(MeshRenderer renderer, MaterialPropertyBlock block,
@@ -242,7 +130,7 @@ public static class FoldedAirflowReference
 }
 ```
 
-## 3. 沿真实路径生成卷云
+## 2. 沿真实路径生成卷云
 
 ```csharp
 using System;
@@ -383,7 +271,7 @@ public sealed class CloudAirflowReference : IDisposable
 }
 ```
 
-## 4. 接入与成本边界
+## 3. 接入与成本边界
 
 在目标工程正式事件中创建或租借根物体，初始化完成后才绘制。把上述代码块分别保存成对应文件；主线程创建一次网格、材质与属性块，并复用它们。共享网格与材质由所有者统一释放；根物体回池时重置年龄、路径与显隐，禁止每次绘制重建资源。
 
@@ -391,11 +279,10 @@ public sealed class CloudAirflowReference : IDisposable
 
 路径示例：使用云材质创建 `CloudAirflowReference`，先加入真实位移起点与终点，后续位移完成后再 `AddPoint`。每帧先按项目时钟 `Advance` 再 `Draw`；`Finished` 时停止绘制并回收。取消或来源失效由正式调用方立即清理。根物体保持世界原点、单位缩放，不挂在移动角色下面。高度单位 `h` 对应人物实际高度；原项目采样点位于地面上方 0.08 世界单位，移植时按项目单位调整。暂停时年龄不推进，Shader 不读取 `_Time`。隐身／变形的可见度由调用方传入，不复制原项目的状态判断。
 
-保留视觉基准时先保留这些公式与纹理，优先改变必要挂点和尺寸，不自动简化成旋转光带。性能核对：
+复用这些几何和运动公式时仍须核对当前参考的轮廓与比例，不自动简化成旋转光带。性能核对：
 
-- 气流片元使用 **1 张纹理、2 次采样**，没有片元循环，也没有额外 flow map。原横向柔边保留一次 `sin` 与 `pow`；不为“零三角函数”直接改变它的亮度分布。
 - 静态翻卷网格为 **935 顶点、1728 三角形**，构建时的循环与三角函数仅执行一次；每帧只更新少数片的姿态与属性。
 - 原路径卷云上限 **1560 顶点、2808 三角形**，每帧 CPU 重建顶点与颜色并上传；其循环与三角函数确实有持续成本，不能称为零成本。低特效示例隐藏第三层只是视觉裁减，仍然遍历并提交该层；要真实省计算与几何，需另做减少层数的网格版本并验证差异。
-- 多片双面透明气纱会叠加屏幕覆盖与 overdraw，人数多时先测透明重叠、CPU 网格更新和上传成本。先复用资源、限制实例与路径采样，再考虑降低网格分段；不要未对比就删掉第二次密度采样或卷曲几何。
+- 多片双面透明气纱会叠加屏幕覆盖与 overdraw，人数多时先测透明重叠、CPU 网格更新和上传成本。先复用资源、限制实例与路径采样，再考虑降低网格分段；程序材质成本与卷曲几何成本分别评估。
 
-这些是从已认可实现提取的参考代码，不代表在其他工程里已完成 Shader 导入或实机验收。正式游戏代码没有因添加本参考而改变。
+这些是提取的几何与运动参考代码，不代表在其他工程里已完成 Shader 导入或实机验收。正式游戏代码没有因添加本参考而改变。

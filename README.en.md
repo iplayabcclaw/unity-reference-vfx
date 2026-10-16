@@ -2,15 +2,19 @@
 
 [中文](README.md) | **English**
 
-An AI skill for reference-driven Unity ability effects: create reference boards, break down visual targets, and translate their silhouettes, materials, spatial relationships, and motion into a Unity project.
+An AI skill for reference-driven Unity ability effects: create reference boards, break down visual targets, and translate their silhouettes, procedural materials, spatial relationships, and motion into a Unity project.
 
 Designed for Unity developers, technical artists, and indie teams using AI to build and refine ability VFX. This repository includes workflow instructions, implementation references, reusable code, and assets. Adapt them to your project's rendering pipeline and actual ability events.
 
+## Implementation constraint: no textures
+
+Reference images are for observation and analysis only. Runtime VFX use actual meshes, mesh particles, vertex animation, and procedural shaders without texture sampling. Color, alpha, mask, normal, density, noise, flow-map, atlas, and flipbook textures are prohibited, as are sprites, billboards, or image planes used to replace effect geometry. Compute procedural noise and analytical fields directly instead of baking them into sampled textures.
+
 ## What it does
 
-- **Create reference boards**: write image-generation prompts and arrange overall effects and key components into technical panels, separating concept references from production assets.
+- **Create reference boards**: write image-generation prompts and arrange overall effects and key components into technical panels, mapping concept references to actual meshes and procedural materials.
 - **Reconstruct effects from images**: analyze reference art, gameplay screenshots, or placement sketches for silhouette, proportions, negative space, lighting, textures, layers, and motion.
-- **Implement in Unity**: choose meshes, particles, flipbooks, ribbons, or trails for each medium; handle shaders, materials, attachment points, orientation, pausing, and pooling lifecycles.
+- **Implement in Unity**: choose actual meshes, dynamic surfaces, mesh particles, or ribbons and trails with varying cross-sections for each medium; handle shaders, materials, attachment points, orientation, pausing, and pooling lifecycles.
 - **Iterate on specific feedback**: refine curvature, placement, thickness, occlusion, brightness, and timing while preserving approved features.
 - **Produce offline code previews**: generate approximate images from actual mesh data and ported material formulas to discuss shape and animation stages.
 
@@ -70,7 +74,6 @@ Providing the Unity version, rendering pipeline, target platform, camera, refere
 | [SKILL.md](SKILL.md) | Entry point, workflow, spatial rules, and delivery boundaries |
 | [agents/openai.yaml](agents/openai.yaml) | Display name, summary, and default prompt |
 | [references/](references/) | Image prompting, reconstruction, integration, and specialized code references |
-| [assets/sword-airflow.png](assets/sword-airflow.png) | Curled-fiber airflow density texture |
 | [assets/procedural-flame/](assets/procedural-flame/) | Unity C# and URP shader for texture-free three-dimensional flames |
 | [scripts/render_mesh_preview.py](scripts/render_mesh_preview.py) | Offline orthographic mesh renderer |
 
@@ -78,9 +81,9 @@ Providing the Unity version, rendering pipeline, target platform, camera, refere
 
 | Task | Reference |
 | --- | --- |
-| Reference boards, image prompts, and production-asset breakdowns | [Multi-panel technical boards](references/multi-panel-reference.md) |
+| Reference boards, image prompts, and component breakdowns | [Multi-panel technical boards](references/multi-panel-reference.md) |
 | Silhouette fidelity, proportions, and layer recipes | [Reference fidelity](references/reference-fidelity.md) |
-| Curled fibers, protective airflow, and trailing clouds | [Folded airflow](references/folded-airflow-reference.md) |
+| Geometry and motion for folded airflow, protective arrangements, and trailing clouds | [Folded airflow](references/folded-airflow-reference.md) |
 | Expanding dust waves, density, and raised crests | [Radial shockwaves](references/dust-shockwave-reference.md) |
 | Branching ground cracks and central rock fragments | [Ground fractures](references/ground-fracture-reference.md) |
 | Three-dimensional flame clusters, hot cores, and procedural burning | [Texture-free flames](references/procedural-flame-reference.md) |

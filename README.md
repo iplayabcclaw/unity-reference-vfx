@@ -2,15 +2,19 @@
 
 **中文** | [English](README.en.md)
 
-参考图驱动的 Unity 技能特效 AI skill：从技能描述和视觉参考出发，制作参考板、拆解效果，并把轮廓、材质、空间关系与运动落实到 Unity 工程。
+参考图驱动的 Unity 技能特效 AI skill：从技能描述和视觉参考出发，制作参考板、拆解效果，并把轮廓、程序材质、空间关系与运动落实到 Unity 工程。
 
 适合希望用 AI 辅助制作和迭代技能特效的 Unity 开发者、技术美术与独立游戏团队。仓库提供工作流程、专项实现参考、可复用代码和素材；使用时按目标项目的渲染管线与正式技能事件接入。
 
+## 实现约束：禁止贴图
+
+参考图只用于观察与拆解。运行时特效使用实际网格、网格粒子、顶点动画和不采样贴图的程序 Shader；禁止颜色图、透明图、遮罩、法线图、密度图、噪声图、Flow Map、图集、序列帧，以及用 Sprite、billboard 或图片面片替代主体。程序噪声与解析场直接计算，不烘焙为纹理再采样。
+
 ## 能做什么
 
-- **制作参考板**：编写生图提示词，组织整体效果与关键部件的多格技术参考板，区分概念参考和独立生产素材。
+- **制作参考板**：编写生图提示词，组织整体效果与关键部件的多格技术参考板，将概念参考映射到实际网格与程序材质。
 - **从图片还原特效**：分析参考图、实机截图或手绘位置图，拆解轮廓、比例、负空间、明暗、纹理、层次和运动。
-- **在 Unity 中实现**：按介质选择网格、粒子、序列帧、条带或拖尾，处理 Shader、材质、挂点、朝向、暂停与对象池生命周期。
+- **在 Unity 中实现**：按介质选择实际网格、动态曲面、网格粒子、有截面变化的条带或拖尾，处理 Shader、材质、挂点、朝向、暂停与对象池生命周期。
 - **针对反馈迭代**：修正弧度、位置、厚度、遮挡、亮度和时序，保持已认可的表现稳定。
 - **生成代码离线预览**：从实际网格数据与移植的材质公式生成近似图片，用于讨论造型和阶段变化。
 
@@ -66,7 +70,6 @@ git clone https://github.com/iplayabcclaw/unity-reference-vfx.git \
 | [SKILL.md](SKILL.md) | 入口、工作流程、空间规则与交付边界 |
 | [agents/openai.yaml](agents/openai.yaml) | 技能显示名称、简介与默认提示词 |
 | [references/](references/) | 生图规范、还原方法、工程接入与专项代码参考 |
-| [assets/sword-airflow.png](assets/sword-airflow.png) | 翻卷纤维气流密度贴图 |
 | [assets/procedural-flame/](assets/procedural-flame/) | 无贴图立体火焰的 Unity C# 与 URP Shader |
 | [scripts/render_mesh_preview.py](scripts/render_mesh_preview.py) | 正交投影的离线网格预览器 |
 
@@ -74,9 +77,9 @@ git clone https://github.com/iplayabcclaw/unity-reference-vfx.git \
 
 | 任务 | 参考 |
 | --- | --- |
-| 参考板、生图提示词与生产素材拆解 | [多格技术参考板](references/multi-panel-reference.md) |
+| 参考板、生图提示词与部件拆解 | [多格技术参考板](references/multi-panel-reference.md) |
 | 轮廓还原、比例与分层配方 | [参考图还原](references/reference-fidelity.md) |
-| 翻卷纤维、护体气流、路径卷云 | [翻卷气流](references/folded-airflow-reference.md) |
+| 翻卷气流、护体摆放与路径卷云的几何和运动 | [翻卷气流](references/folded-airflow-reference.md) |
 | 扩散尘浪、浓度和隆起波峰 | [径向震荡波](references/dust-shockwave-reference.md) |
 | 地面分叉裂纹与中央碎岩 | [龟裂与碎岩](references/ground-fracture-reference.md) |
 | 立体火簇、热芯与程序燃烧 | [无贴图火焰](references/procedural-flame-reference.md) |
