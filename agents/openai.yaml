@@ -1,0 +1,4 @@
+interface:
+  display_name: "参考图驱动的 Unity 技能特效"
+  short_description: "按内置生图规范制作技能整体与部件参考板，分层实现 Unity 特效并修正还原差异"
+  default_prompt: "使用 $unity-reference-vfx 按内置生图规范与项目约束制作技能特效参考板或分析已有图片；需要实现时结合 Unity 工程的管线与正式事件还原，并说明验证范围。"
